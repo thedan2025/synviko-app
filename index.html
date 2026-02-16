@@ -1,87 +1,125 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SYNVIKO</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SYNVIKO App</title>
+
 <style>
-body{
-font-family:Arial;
-background:#0b132b;
-color:white;
-padding:15px;
+body{font-family:Arial, sans-serif;margin:0;background:#0b1733;color:white}
+header{background:#09122b;padding:15px;text-align:center;font-size:20px;font-weight:bold}
+.container{padding:15px}
+
+.panel-btn{
+width:100%;padding:14px;margin:8px 0;border:none;border-radius:14px;
+background:#3c6fd1;color:white;font-size:16px;font-weight:bold;
 }
-input,select,button{
+
+.panel{
+background:#101c3f;
+padding:15px;
+border-radius:14px;
+margin-top:5px;
+display:none;
+}
+
+input,select{
 width:100%;
-padding:12px;
-margin:5px 0;
-border-radius:8px;
+padding:14px;
+margin:6px 0;
+border-radius:12px;
 border:none;
 }
-button{
-background:#2563eb;
+
+button.action{
+background:#3c6fd1;
 color:white;
+border:none;
+padding:14px;
+border-radius:12px;
+width:100%;
 font-weight:bold;
+margin-top:8px;
 }
-.panel{
-background:#1c2541;
-padding:15px;
-border-radius:10px;
-margin-bottom:15px;
-}
-.hidden{display:none;}
-.card{
-background:#3a506b;
-padding:10px;
+
+.status{
+background:#eee;
+color:#000;
+padding:8px;
 border-radius:8px;
-margin:5px 0;
+margin-top:8px;
 }
 </style>
 </head>
+
 <body>
 
-<h2>SYNVIKO</h2>
+<header>SYNVIKO</header>
 
-<!-- REGISTRO -->
-<div class="panel">
-<h3>Solicitar registro</h3>
-<input id="nombre" placeholder="Nombre">
-<input id="telefono" placeholder="Teléfono">
-<select id="tipo">
+<div class="container">
+
+<button class="panel-btn" onclick="togglePanel('envio')">🚚 Nuevo Envío</button>
+<div id="envio" class="panel">
+
+<input id="clienteNombre" placeholder="Nombre del cliente">
+<input id="clienteTelefono" placeholder="Teléfono cliente">
+<input id="origen" placeholder="Dirección recogida">
+<input id="destino" placeholder="Dirección entrega">
+
+<input id="km" placeholder="Distancia automática" disabled>
+<input id="precio" placeholder="Tarifa estimada" disabled>
+
+<button class="action" onclick="calcularDistancia()">Calcular distancia y tarifa</button>
+<button class="action" onclick="verRuta()">Ver ruta en mapa</button>
+
+<button class="action" onclick="crearPedido()">Crear pedido</button>
+
+<div id="estadoPedido" class="status">Sin pedido creado</div>
+</div>
+
+<button class="panel-btn" onclick="togglePanel('pedidos')">📦 Pedidos Activos</button>
+<div id="pedidos" class="panel">
+<div id="listaPedidos"></div>
+</div>
+
+<button class="panel-btn" onclick="togglePanel('registro')">📝 Solicitar registro</button>
+<div id="registro" class="panel">
+
+<select id="tipoRegistro">
 <option value="cliente">Cliente</option>
 <option value="motorizado">Motorizado</option>
 </select>
-<button onclick="registrar()">Enviar solicitud</button>
+
+<input id="nombreRegistro" placeholder="Nombre completo">
+<input id="telefonoRegistro" placeholder="Teléfono">
+
+<button class="action" onclick="solicitarRegistro()">Enviar solicitud</button>
+<div id="estadoRegistro" class="status">Sin solicitud enviada</div>
+
 </div>
 
-<!-- NUEVO PEDIDO -->
-<div class="panel">
-<h3>Nuevo envío</h3>
-<input id="cliente" placeholder="Nombre cliente">
-<input id="recogida" placeholder="Dirección recogida">
-<input id="entrega" placeholder="Dirección entrega">
-<button onclick="calcular()">Calcular tarifa</button>
-<h3 id="tarifa"></h3>
-<button onclick="crearPedido()">Crear pedido</button>
-</div>
+<button class="panel-btn" onclick="abrirWhatsApp()">📄 Gestoría</button>
 
-<!-- PEDIDOS -->
-<div class="panel">
-<h3>Pedidos activos</h3>
-<div id="pedidos"></div>
-</div>
-
-<!-- ADMIN -->
+<!-- Panel Admin -->
 <div class="panel">
 <h3>Panel Administrador</h3>
 <input id="passAdmin" placeholder="Contraseña">
-<button onclick="loginAdmin()">Entrar</button>
+<button class="action" onclick="loginAdmin()">Entrar</button>
 <div id="adminPanel" class="hidden">
 <h4>Solicitudes pendientes</h4>
 <div id="solicitudes"></div>
+
+<h4>Pedidos pendientes</h4>
+<div id="pedidosAdmin"></div>
 </div>
 </div>
 
-<!-- FIREBASE -->
+</div>
+
+<!-- Google Maps API -->
+<script src="https://maps.googleapis.com/maps/api/js?key=TU_API_KEY&libraries=places"></script>
+
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"></script>
 
@@ -99,77 +137,149 @@ appId: "1:770434547807:web:e6f456509a996d69aa1bea"
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-function registrar(){
-db.ref("solicitudes").push({
-nombre: document.getElementById("nombre").value,
-telefono: document.getElementById("telefono").value,
-tipo: document.getElementById("tipo").value,
-estado:"pendiente"
-});
-alert("Solicitud enviada");
+function togglePanel(id){
+    let panel=document.getElementById(id);
+    panel.style.display = panel.style.display==="block" ? "none" : "block";
 }
 
-function calcular(){
-let km = Math.floor(Math.random()*10)+1;
-let precio = km*0.5;
-window.precioActual = precio;
-document.getElementById("tarifa").innerText="Tarifa: $"+precio;
+/* -------- DISTANCIA REAL -------- */
+async function calcularDistancia(){
+    let origen = document.getElementById("origen").value;
+    let destino = document.getElementById("destino").value;
+
+    if(!origen || !destino){
+        alert("Ingrese direcciones");
+        return;
+    }
+
+    let service = new google.maps.DistanceMatrixService();
+
+    service.getDistanceMatrix({
+        origins: [origen],
+        destinations: [destino],
+        travelMode: 'DRIVING',
+        unitSystem: google.maps.UnitSystem.METRIC
+    }, function(response, status){
+        if(status !== 'OK'){
+            alert('Error al calcular la distancia: ' + status);
+        } else {
+            let result = response.rows[0].elements[0];
+            if(result.status === "OK"){
+                let km = result.distance.value / 1000; // metros a km
+                document.getElementById("km").value = km.toFixed(2) + " km";
+                document.getElementById("precio").value = "$" + (km * 0.5).toFixed(2);
+            } else {
+                alert('No se pudo obtener la distancia.');
+            }
+        }
+    });
 }
 
+function verRuta(){
+    let o=document.getElementById("origen").value;
+    let d=document.getElementById("destino").value;
+    window.open("https://www.google.com/maps/dir/"+o+"/"+d);
+}
+
+/* -------- REGISTRO -------- */
+function solicitarRegistro(){
+    let nombre=document.getElementById("nombreRegistro").value;
+    let telefono=document.getElementById("telefonoRegistro").value;
+    let tipo=document.getElementById("tipoRegistro").value;
+
+    if(!nombre || !telefono){
+        alert("Complete todos los campos");
+        return;
+    }
+
+    db.ref("solicitudes").push({
+        nombre,nombre,
+        telefono,telefono,
+        tipo:tipo,
+        estado:"pendiente"
+    });
+
+    document.getElementById("estadoRegistro").innerText = "Solicitud enviada. Pendiente aprobación.";
+}
+
+/* -------- PEDIDOS -------- */
 function crearPedido(){
-db.ref("pedidos").push({
-cliente: document.getElementById("cliente").value,
-recogida: document.getElementById("recogida").value,
-entrega: document.getElementById("entrega").value,
-precio: window.precioActual||0,
-estado:"pendiente"
-});
-alert("Pedido creado");
+    let cliente=document.getElementById("clienteNombre").value;
+    let telefono=document.getElementById("clienteTelefono").value;
+    let origen=document.getElementById("origen").value;
+    let destino=document.getElementById("destino").value;
+    let distancia=document.getElementById("km").value;
+    let precio=document.getElementById("precio").value;
+
+    if(!cliente || !telefono || !origen || !destino){
+        alert("Complete todos los campos");
+        return;
+    }
+
+    db.ref("pedidos").push({
+        cliente,telefono,origen,destino,distancia,precio,estado:"Pendiente"
+    });
+
+    document.getElementById("estadoPedido").innerText="Pedido creado";
 }
 
-db.ref("pedidos").on("value", snap=>{
-let pedidosDiv=document.getElementById("pedidos");
-pedidosDiv.innerHTML="";
-snap.forEach(p=>{
-let d=p.val();
-pedidosDiv.innerHTML+=`
-<div class="card">
-Cliente: ${d.cliente}<br>
-Entrega: ${d.entrega}<br>
-Precio: $${d.precio}<br>
-Estado: ${d.estado}
-</div>`;
-});
+/* -------- CARGAR PEDIDOS -------- */
+db.ref("pedidos").on("value",snap=>{
+    let lista=document.getElementById("listaPedidos");
+    let listaAdmin=document.getElementById("pedidosAdmin");
+    lista.innerHTML="";
+    listaAdmin.innerHTML="";
+
+    snap.forEach(p=>{
+        let d=p.val();
+        let item=document.createElement("div");
+        item.className="status";
+        item.innerHTML="Cliente: "+d.cliente+"<br>Distancia: "+d.distancia+"<br>Tarifa: "+d.precio+"<br>Estado: "+d.estado;
+        lista.appendChild(item);
+
+        // Panel admin
+        let itemAdmin=document.createElement("div");
+        itemAdmin.className="status";
+        itemAdmin.innerHTML="Cliente: "+d.cliente+"<br>Distancia: "+d.distancia+"<br>Tarifa: "+d.precio+"<br>Estado: "+d.estado;
+        listaAdmin.appendChild(itemAdmin);
+    });
 });
 
+/* -------- PANEL ADMIN -------- */
 function loginAdmin(){
-let clave = document.getElementById("passAdmin").value;
-if(clave=="1234"){
-document.getElementById("adminPanel").classList.remove("hidden");
-cargarSolicitudes();
-}else alert("Clave incorrecta");
+    let clave=document.getElementById("passAdmin").value;
+    if(clave==="1234"){
+        document.getElementById("adminPanel").classList.remove("hidden");
+        cargarSolicitudes();
+    } else alert("Clave incorrecta");
 }
 
 function cargarSolicitudes(){
-db.ref("solicitudes").on("value", snap=>{
-let solicitudesDiv=document.getElementById("solicitudes");
-solicitudesDiv.innerHTML="";
-snap.forEach(s=>{
-let d=s.val();
-if(d.estado=="pendiente"){
-solicitudesDiv.innerHTML+=`
-<div class="card">
-${d.nombre} - ${d.tipo}
-<button onclick="aprobar('${s.key}')">Aprobar</button>
-</div>`;
-}
-});
-});
+    db.ref("solicitudes").on("value",snap=>{
+        let div=document.getElementById("solicitudes");
+        div.innerHTML="";
+        snap.forEach(s=>{
+            let d=s.val();
+            if(d.estado==="pendiente"){
+                let item=document.createElement("div");
+                item.className="status";
+                item.innerHTML=d.nombre+" - "+d.tipo+
+                "<button onclick=\"aprobarSolicitud('"+s.key+"')\">Aprobar</button>";
+                div.appendChild(item);
+            }
+        });
+    });
 }
 
-function aprobar(id){
-db.ref("solicitudes/"+id).update({estado:"aprobado"});
+function aprobarSolicitud(id){
+    db.ref("solicitudes/"+id).update({estado:"aprobado"});
 }
+
+/* -------- GESTORÍA -------- */
+function abrirWhatsApp(){
+    window.open("https://wa.me/593987697105","_blank");
+}
+
 </script>
 
 </body>
