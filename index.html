@@ -3,7 +3,6 @@
 <head>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SYNVIKO</title>
-
 <style>
 body{
 font-family:Arial;
@@ -38,7 +37,6 @@ margin:5px 0;
 }
 </style>
 </head>
-
 <body>
 
 <h2>SYNVIKO</h2>
@@ -48,27 +46,21 @@ margin:5px 0;
 <h3>Solicitar registro</h3>
 <input id="nombre" placeholder="Nombre">
 <input id="telefono" placeholder="Teléfono">
-
 <select id="tipo">
 <option value="cliente">Cliente</option>
 <option value="motorizado">Motorizado</option>
 </select>
-
 <button onclick="registrar()">Enviar solicitud</button>
 </div>
 
 <!-- NUEVO PEDIDO -->
 <div class="panel">
 <h3>Nuevo envío</h3>
-
 <input id="cliente" placeholder="Nombre cliente">
 <input id="recogida" placeholder="Dirección recogida">
 <input id="entrega" placeholder="Dirección entrega">
-
 <button onclick="calcular()">Calcular tarifa</button>
-
 <h3 id="tarifa"></h3>
-
 <button onclick="crearPedido()">Crear pedido</button>
 </div>
 
@@ -83,20 +75,17 @@ margin:5px 0;
 <h3>Panel Administrador</h3>
 <input id="passAdmin" placeholder="Contraseña">
 <button onclick="loginAdmin()">Entrar</button>
-
 <div id="adminPanel" class="hidden">
 <h4>Solicitudes pendientes</h4>
 <div id="solicitudes"></div>
 </div>
 </div>
 
-<script type="module">
-import { initializeApp }
-from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+<!-- FIREBASE -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"></script>
 
-import { getDatabase, ref, push, onValue, update }
-from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-
+<script>
 const firebaseConfig = {
 apiKey: "AIzaSyClYtHMWFy6eyUg4eXMo_1zlQE9a3Occ04",
 authDomain: "synviko-97da5.firebaseapp.com",
@@ -107,42 +96,43 @@ messagingSenderId: "770434547807",
 appId: "1:770434547807:web:e6f456509a996d69aa1bea"
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
-window.registrar = function(){
-push(ref(db,"solicitudes"),{
-nombre:nombre.value,
-telefono:telefono.value,
-tipo:tipo.value,
+function registrar(){
+db.ref("solicitudes").push({
+nombre: document.getElementById("nombre").value,
+telefono: document.getElementById("telefono").value,
+tipo: document.getElementById("tipo").value,
 estado:"pendiente"
 });
 alert("Solicitud enviada");
 }
 
-window.calcular = function(){
+function calcular(){
 let km = Math.floor(Math.random()*10)+1;
-let precio = km * 0.5;
+let precio = km*0.5;
 window.precioActual = precio;
-tarifa.innerText="Tarifa: $"+precio;
+document.getElementById("tarifa").innerText="Tarifa: $"+precio;
 }
 
-window.crearPedido = function(){
-push(ref(db,"pedidos"),{
-cliente:cliente.value,
-recogida:recogida.value,
-entrega:entrega.value,
-precio:window.precioActual || 0,
+function crearPedido(){
+db.ref("pedidos").push({
+cliente: document.getElementById("cliente").value,
+recogida: document.getElementById("recogida").value,
+entrega: document.getElementById("entrega").value,
+precio: window.precioActual||0,
 estado:"pendiente"
 });
 alert("Pedido creado");
 }
 
-onValue(ref(db,"pedidos"),snap=>{
-pedidos.innerHTML="";
+db.ref("pedidos").on("value", snap=>{
+let pedidosDiv=document.getElementById("pedidos");
+pedidosDiv.innerHTML="";
 snap.forEach(p=>{
 let d=p.val();
-pedidos.innerHTML+=`
+pedidosDiv.innerHTML+=`
 <div class="card">
 Cliente: ${d.cliente}<br>
 Entrega: ${d.entrega}<br>
@@ -152,20 +142,22 @@ Estado: ${d.estado}
 });
 });
 
-window.loginAdmin=function(){
-if(passAdmin.value=="1234"){
-adminPanel.classList.remove("hidden");
+function loginAdmin(){
+let clave = document.getElementById("passAdmin").value;
+if(clave=="1234"){
+document.getElementById("adminPanel").classList.remove("hidden");
 cargarSolicitudes();
 }else alert("Clave incorrecta");
 }
 
 function cargarSolicitudes(){
-onValue(ref(db,"solicitudes"),snap=>{
-solicitudes.innerHTML="";
+db.ref("solicitudes").on("value", snap=>{
+let solicitudesDiv=document.getElementById("solicitudes");
+solicitudesDiv.innerHTML="";
 snap.forEach(s=>{
 let d=s.val();
 if(d.estado=="pendiente"){
-solicitudes.innerHTML+=`
+solicitudesDiv.innerHTML+=`
 <div class="card">
 ${d.nombre} - ${d.tipo}
 <button onclick="aprobar('${s.key}')">Aprobar</button>
@@ -175,8 +167,8 @@ ${d.nombre} - ${d.tipo}
 });
 }
 
-window.aprobar=function(id){
-update(ref(db,"solicitudes/"+id),{estado:"aprobado"});
+function aprobar(id){
+db.ref("solicitudes/"+id).update({estado:"aprobado"});
 }
 </script>
 
