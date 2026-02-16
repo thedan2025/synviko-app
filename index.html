@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SYNVIKO</title>
+
+<style>
+body{
+font-family:Arial;
+background:#0b132b;
+color:white;
+padding:15px;
+}
+input,select,button{
+width:100%;
+padding:12px;
+margin:5px 0;
+border-radius:8px;
+border:none;
+}
+button{
+background:#2563eb;
+color:white;
+font-weight:bold;
+}
+.panel{
+background:#1c2541;
+padding:15px;
+border-radius:10px;
+margin-bottom:15px;
+}
+.hidden{display:none;}
+.card{
+background:#3a506b;
+padding:10px;
+border-radius:8px;
+margin:5px 0;
+}
+</style>
+</head>
+
+<body>
+
+<h2>SYNVIKO</h2>
+
+<!-- REGISTRO -->
+<div class="panel">
+<h3>Solicitar registro</h3>
+<input id="nombre" placeholder="Nombre">
+<input id="telefono" placeholder="Teléfono">
+
+<select id="tipo">
+<option value="cliente">Cliente</option>
+<option value="motorizado">Motorizado</option>
+</select>
+
+<button onclick="registrar()">Enviar solicitud</button>
+</div>
+
+<!-- NUEVO PEDIDO -->
+<div class="panel">
+<h3>Nuevo envío</h3>
+
+<input id="cliente" placeholder="Nombre cliente">
+<input id="recogida" placeholder="Dirección recogida">
+<input id="entrega" placeholder="Dirección entrega">
+
+<button onclick="calcular()">Calcular tarifa</button>
+
+<h3 id="tarifa"></h3>
+
+<button onclick="crearPedido()">Crear pedido</button>
+</div>
+
+<!-- PEDIDOS -->
+<div class="panel">
+<h3>Pedidos activos</h3>
+<div id="pedidos"></div>
+</div>
+
+<!-- ADMIN -->
+<div class="panel">
+<h3>Panel Administrador</h3>
+<input id="passAdmin" placeholder="Contraseña">
+<button onclick="loginAdmin()">Entrar</button>
+
+<div id="adminPanel" class="hidden">
+<h4>Solicitudes pendientes</h4>
+<div id="solicitudes"></div>
+</div>
+</div>
+
+<script type="module">
+import { initializeApp }
+from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+
+import { getDatabase, ref, push, onValue, update }
+from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+const firebaseConfig = {
+apiKey: "AIzaSyClYtHMWFy6eyUg4eXMo_1zlQE9a3Occ04",
+authDomain: "synviko-97da5.firebaseapp.com",
+databaseURL: "https://synviko-97da5-default-rtdb.firebaseio.com",
+projectId: "synviko-97da5",
+storageBucket: "synviko-97da5.firebasestorage.app",
+messagingSenderId: "770434547807",
+appId: "1:770434547807:web:e6f456509a996d69aa1bea"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+window.registrar = function(){
+push(ref(db,"solicitudes"),{
+nombre:nombre.value,
+telefono:telefono.value,
+tipo:tipo.value,
+estado:"pendiente"
+});
+alert("Solicitud enviada");
+}
+
+window.calcular = function(){
+let km = Math.floor(Math.random()*10)+1;
+let precio = km * 0.5;
+window.precioActual = precio;
+tarifa.innerText="Tarifa: $"+precio;
+}
+
+window.crearPedido = function(){
+push(ref(db,"pedidos"),{
+cliente:cliente.value,
+recogida:recogida.value,
+entrega:entrega.value,
+precio:window.precioActual || 0,
+estado:"pendiente"
+});
+alert("Pedido creado");
+}
+
+onValue(ref(db,"pedidos"),snap=>{
+pedidos.innerHTML="";
+snap.forEach(p=>{
+let d=p.val();
+pedidos.innerHTML+=`
+<div class="card">
+Cliente: ${d.cliente}<br>
+Entrega: ${d.entrega}<br>
+Precio: $${d.precio}<br>
+Estado: ${d.estado}
+</div>`;
+});
+});
+
+window.loginAdmin=function(){
+if(passAdmin.value=="1234"){
+adminPanel.classList.remove("hidden");
+cargarSolicitudes();
+}else alert("Clave incorrecta");
+}
+
+function cargarSolicitudes(){
+onValue(ref(db,"solicitudes"),snap=>{
+solicitudes.innerHTML="";
+snap.forEach(s=>{
+let d=s.val();
+if(d.estado=="pendiente"){
+solicitudes.innerHTML+=`
+<div class="card">
+${d.nombre} - ${d.tipo}
+<button onclick="aprobar('${s.key}')">Aprobar</button>
+</div>`;
+}
+});
+});
+}
+
+window.aprobar=function(id){
+update(ref(db,"solicitudes/"+id),{estado:"aprobado"});
+}
+</script>
+
+</body>
+</html>
